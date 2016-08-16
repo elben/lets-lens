@@ -52,12 +52,29 @@ import Prelude hiding (product)
 -- >>> import Data.Char(ord)
 -- >>> import Lets.Data
 
+-- One way of looking at a lens is a way of looking into a data structure, and
+-- setting/getting things inside of it. The lens does not hold any data; it
+-- simply tells you how to get a 'b' out of an 'a', and how to set a 'b' inside
+-- of 'a'. That is, a lens consist of two functions:
+--
+-- a - the "box" we are looking into to get/set stuff
+-- b - the thing, for this lens, we are grabbing inside 'a'
+--
+-- (a -> b -> a) - the "setter"; given the box 'a', and a new value 'b', set it
+--                 inside 'a' and return the new 'a'
+--
+-- (a -> b)      - the "getter"; given the box 'a', grab the item 'b' inside it
+--
 data Lens a b =
   Lens
     (a -> b -> a)
     (a -> b)
 
 -- |
+-- fstL ::
+--   Lens (x, y) x
+-- fstL =
+--   Lens const fst
 --
 -- >>> get fstL (0 :: Int, "abc")
 -- 0
@@ -72,8 +89,8 @@ get ::
   Lens a b
   -> a
   -> b
-get (Lens _ g) =
-  g
+get (Lens _ g) a =
+  g a
 
 -- |
 --
@@ -88,7 +105,7 @@ get (Lens _ g) =
 -- prop> let types = (x :: Int, y :: String) in set sndL (x, y) z == (x, z)
 set ::
   Lens a b
-  -> a 
+  -> a
   -> b
   -> a
 set (Lens s _) a =
@@ -102,7 +119,7 @@ getsetLaw ::
   -> Bool
 getsetLaw l =
   \a -> set l a (get l a) == a
-  
+
 -- | The set/get law of lenses. This function should always return @True@.
 setgetLaw ::
   Eq b =>
@@ -112,7 +129,7 @@ setgetLaw ::
   -> Bool
 setgetLaw l a b =
   get l (set l a b) == b
-  
+
 -- | The set/set law of lenses. This function should always return @True@.
 setsetLaw ::
   Eq a =>
@@ -142,8 +159,8 @@ modify ::
   -> (b -> b)
   -> a
   -> a
-modify =
-  error "todo: modify"
+modify l m a =
+  set l a (m (get l a))
 
 -- | An alias for @modify@.
 (%~) ::
@@ -156,7 +173,7 @@ modify =
 
 infixr 4 %~
 
--- |
+-- | Set
 --
 -- >>> fstL .~ 1 $ (0 :: Int, "abc")
 -- (1,"abc")
@@ -172,14 +189,13 @@ infixr 4 %~
   -> b
   -> a
   -> a
-(.~) =
-  error "todo: (.~)"
+(.~) l b a = set l a b
 
 infixl 5 .~
 
 -- |
 --
--- >>> fmodify fstL (+) (5 :: Int, "abc") 8
+-- >>> (fmodify fstL (+) (5 :: Int, "abc")) 8
 -- (13,"abc")
 --
 -- >>> fmodify fstL (\n -> bool Nothing (Just (n * 2)) (even n)) (10, "abc")
@@ -193,10 +209,12 @@ fmodify ::
   -> (b -> f b)
   -> a
   -> f a
-fmodify =
-  error "todo: fmodify"
+fmodify l f a =
+  let fb = f (get l a)
+  in (\b -> set l a b) `fmap` fb
+-- functor: fmap :: f x -> (x -> y) -> f y
 
--- |
+-- | "Functor set"?
 --
 -- >>> fstL |= Just 3 $ (7, "abc")
 -- Just (3,"abc")
@@ -209,8 +227,8 @@ fmodify =
   -> f b
   -> a
   -> f a
-(|=) =
-  error "todo: (|=)"
+(|=) l fb a =
+  fmap (\b -> set l a b) fb
 
 infixl 5 |=
 
@@ -224,10 +242,14 @@ infixl 5 |=
 -- prop> let types = (x :: Int, y :: String) in setgetLaw fstL (x, y) z
 --
 -- prop> let types = (x :: Int, y :: String) in setsetLaw fstL (x, y) z
+-- data Lens a b =
+--   Lens
+--     (a -> b -> a)
+--     (a -> b)
 fstL ::
   Lens (x, y) x
 fstL =
-  error "todo: fstL"
+  Lens (\(_,y) x' -> (x',y)) fst
 
 -- |
 --
@@ -242,7 +264,7 @@ fstL =
 sndL ::
   Lens (x, y) y
 sndL =
-  error "todo: sndL"
+  Lens (\(x,_) y' -> (x,y')) snd
 
 -- |
 --
